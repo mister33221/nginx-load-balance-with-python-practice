@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  backend1:
+    build:
+      context: ./backend1
+    ports:
+      - "5001:5000"
+
+  backend2:
+    build:
+      context: ./backend2
+    ports:
+      - "5002:5000"
+
+  frontend:
+    build:
+      context: ./frontend
+    ports:
+      - "80:80"
+
+  nginx:
+    build:
+      context: ./nginx
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend1
+      - backend2
+      - frontend
