@@ -1,7 +1,20 @@
-# [Nginx]
+# [Nginx] 基礎介紹
 
-- [Load Balancer](#load-balancer)
-- [Nginx 介紹](#nginx-%E4%BB%8B%E7%B4%B9)
+<!-- TOC -->
+
+- [[Nginx] 基礎介紹](#nginx-%E5%9F%BA%E7%A4%8E%E4%BB%8B%E7%B4%B9)
+    - [Load Balancer](#load-balancer)
+    - [Nginx 介紹](#nginx-%E4%BB%8B%E7%B4%B9)
+    - [安裝 Nginx](#%E5%AE%89%E8%A3%9D-nginx)
+    - [查看 Nginx 的設定檔](#%E6%9F%A5%E7%9C%8B-nginx-%E7%9A%84%E8%A8%AD%E5%AE%9A%E6%AA%94)
+    - [查看 Nginx 的預設的 html 歡迎頁](#%E6%9F%A5%E7%9C%8B-nginx-%E7%9A%84%E9%A0%90%E8%A8%AD%E7%9A%84-html-%E6%AD%A1%E8%BF%8E%E9%A0%81)
+    - [如果我的網站還有包含一些靜態檔案，例如：圖片、CSS、JavaScript 等，我該如何部署到 Nginx 上呢？](#%E5%A6%82%E6%9E%9C%E6%88%91%E7%9A%84%E7%B6%B2%E7%AB%99%E9%82%84%E6%9C%89%E5%8C%85%E5%90%AB%E4%B8%80%E4%BA%9B%E9%9D%9C%E6%85%8B%E6%AA%94%E6%A1%88%E4%BE%8B%E5%A6%82%E5%9C%96%E7%89%87cssjavascript-%E7%AD%89%E6%88%91%E8%A9%B2%E5%A6%82%E4%BD%95%E9%83%A8%E7%BD%B2%E5%88%B0-nginx-%E4%B8%8A%E5%91%A2)
+    - [Serving 靜態內容](#serving-%E9%9D%9C%E6%85%8B%E5%85%A7%E5%AE%B9)
+    - [如果我想要使用網址來訪問不同的分頁呢?](#%E5%A6%82%E6%9E%9C%E6%88%91%E6%83%B3%E8%A6%81%E4%BD%BF%E7%94%A8%E7%B6%B2%E5%9D%80%E4%BE%86%E8%A8%AA%E5%95%8F%E4%B8%8D%E5%90%8C%E7%9A%84%E5%88%86%E9%A0%81%E5%91%A2)
+    - [將 Angular 專案部署到 Nginx](#%E5%B0%87-angular-%E5%B0%88%E6%A1%88%E9%83%A8%E7%BD%B2%E5%88%B0-nginx)
+    - [Load Balancer 流量分配](#load-balancer-%E6%B5%81%E9%87%8F%E5%88%86%E9%85%8D)
+
+<!-- /TOC -->
 
 以下我們先來舉幾個問題，讓大家了解為什麼我們需要一個 Nginx 插在 Client 和 Server 之間。
 
@@ -348,5 +361,183 @@ services:
 
 ## Load Balancer 流量分配
 
-當我們有多台 Server 時，我們可以使用 Nginx 來做 Load Balancer，讓 Nginx 幫我們分配流量。
+當我們有多台 Server 時，我們可以使用 Nginx 來做 Load Balancer，讓 Nginx 幫我們分配流量，讓 Server 可以平均的處理 request，降低 Server 的負擔。
+
+1.建立一個資料夾叫做 `backend1`，並在裡面建立一個 `app.py` 檔案，及一個 `Dockerfile` 檔案。
+```python
+from flask import Flask # 引入 Flask，Flask 是一個 Python 的 Web 框架，可以用來快速開發 Web 應用程式，當作我們的 Server。
+
+app = Flask(__name__) # 創建一個 Flask 應用程式，__name__ 是 Python 的特殊變數，用來指定模組的名稱。
+
+@app.route('/api') # 設定一個路由，當訪問 /api 時，會執行下面的方法。
+def index(): 
+    return "Hello from Backend 1" # 返回一個字符串 "Hello from Backend 1"。這就表示我們正在訪問 Backend 1。
+
+if __name__ == '__main__': # 表示當這個文件被直接運行時，讓 Flask 開始監聽 5000 port。
+    print("Backend 1 is running")
+    app.run(host='0.0.0.0', port=5000)
+```
+```dockerfile
+# 使用 Python 3.9-slim 映像檔
+FROM python:3.9-slim   
+# 設定工作目錄為 /app
+WORKDIR /app
+# 將我們執行指令時，所在的目錄下的 app.py 複製到 /app 目錄下
+COPY app.py /app
+# 安裝 Flask，這個指令將會執行在你前面指定的工作目錄下
+RUN pip install flask
+# 指定容器監聽 5000 port，需要注意的是，這只是告訴 Docker 這個容器要監聽 5000 port，並不是把 5000 port 映射到主機的 5000 port。
+EXPOSE 5000
+# 指在工作目錄下執行 `python app.py`，這樣當我們啟動容器時，就會執行這個指令，啟動我們的 Flask 應用程式。
+CMD ["python", "app.py"]
+```
+2.建立一個資料夾叫做 `backend2`，並在裡面建立一個 `app.py` 檔案，及一個 `Dockerfile` 檔案。
+```python
+from flask import Flask
+
+app = Flask(__name__)
+
+@app.route('/api')
+def index():
+    return "Hello from Backend 2"
+
+if __name__ == '__main__':
+    print("Backend 1 is running")
+    app.run(host='0.0.0.0', port=5000)
+```
+```dockerfile
+FROM python:3.9-slim
+WORKDIR /app
+COPY app.py /app
+RUN pip install flask
+EXPOSE 5000
+CMD ["python", "app.py"]
+```
+3. 建立一個資料夾叫做 `frontend`，並在裡面建立一個 `index.html` 檔案，及一個 `Dockerfile` 檔案。
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Load Balancer Test</title>
+</head>
+<body>
+    <h1>Load Balancer Test</h1>
+    <button onclick="fetchBackend()">Call Backend</button>
+    <p id="response"></p>
+
+    <script>
+        function fetchBackend() {
+            fetch('http://localhost:8080/api')
+                .then(response => response.text())
+                .then(data => {
+                    document.getElementById('response').innerText = data;
+                });
+        }
+    </script>
+</body>
+</html>
+```
+```dockerfile
+# 使用 Nginx 映像檔
+FROM nginx:alpine
+# 將我們執行指令時，所在的目錄下的 index.html 複製到 /usr/share/nginx/html 目錄下，取代 Nginx 預設的 html 檔案。這樣當我們訪問 Nginx 預測的 80 port 歡迎頁面時，就會顯示我們的 index.html。
+COPY index.html /usr/share/nginx/html
+```
+4. 建立一個資料夾叫做 `nginx`，並在裡面建立一個 `nginx.conf` ，及一個 `Dockerfile` 檔案。
+```conf
+events {}  # 這個區塊用來配置基於事件驅動的模型。這裡是空的，所以使用預設設定。
+
+http {  # 這個區塊用來配置 HTTP 伺服器。
+    upstream backend {  # 這個區塊定義了一組後端伺服器組。
+        server backend1:5000;  # 這是第一個後端伺服器。
+        server backend2:5000;  # 這是第二個後端伺服器。
+    }
+
+    server {  # 這個區塊定義了一個伺服器，該伺服器在某個特定的埠上監聽來自客戶端的請求。
+        listen 80;  # 伺服器在 80 埠上監聽。以這個專案來說，就是監聽我們的前端應用程式。
+
+        location / {  # 這個區塊配置了如何回應對根 URL ("/") 的請求。
+            root /usr/share/nginx/html;  # 靜態檔案的根目錄。也就是我們的前端應用程式的目錄。
+            index index.html index.htm;  # 預設的索引檔案。也就是我們的前端應用程式的入口檔案。
+        }
+
+        location /api {  # 這個區塊配置了如何回應以 "/api" 開頭的 URL 的請求。
+            proxy_pass http://backend;  # 請求會被傳送到前面定義的後端組。直接使用在 upstream 區塊定義的後端伺服器名稱即可。
+            
+            # proxy_set_header 是用來設定標頭的指令，這裡設定了一些標頭，傳給後端，讓後端知道這個請求所攜帶的資訊。
+            proxy_set_header Host $host;  # 是用來設定標頭的指令，Host 是要設定的標頭名稱，$host 是 Nginx 變數，代表請求的主機名稱。
+            proxy_set_header X-Real-IP $remote_addr;  # 是用來設定標頭的指令，X-Real-IP 是要設定的標頭名稱，$remote_addr 是 Nginx 變數，代表客戶端(哪裡發來的請求)的 IP 地址。
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;  # 是用來設定標頭的指令，X-Forwarded-For 是要設定的標頭名稱，$proxy_add_x_forwarded_for 是 Nginx 變數，代表客戶端的 IP 地址和之前的代理伺服器的 IP 地址列表。
+            proxy_set_header X-Forwarded-Proto $scheme;  # 是用來設定標頭的指令，X-Forwarded-Proto 是要設定的標頭名稱，$scheme 是 Nginx 變數，代表請求使用的協議（通常是 http 或 https）。
+
+            # add_header 是用來新增標頭的指令，新增完傳回給客戶端(前端)。
+            add_header 'Access-Control-Allow-Origin' '*';  # 任何網域都可以存取這個 API。
+            add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS';  # 允許這些 HTTP 方法。
+            add_header 'Access-Control-Allow-Headers' 'Origin, Content-Type, Accept, Authorization';  # 允許這些 HTTP 標頭。
+        }
+    }
+}
+```
+```dockerfile
+FROM nginx:alpine
+COPY nginx.conf /etc/nginx/nginx.conf
+```
+5. 接著在最外層建立一個 `docker-compose.yaml` 檔案，並在裡面加入以下內容。
+```yaml
+version: '3.8'  # 使用的 Docker Compose 文件格式的版本
+
+services:  # 定義多個服務，每個服務都會運行在一個單獨的容器中
+  backend1:  # 服務名稱
+    build:  # 構建服務的配置
+      context: ./backend1  # Dockerfile 所在的路徑
+    ports:  # 容器的端口映射
+      - "5001:5000"  # 本機的 5001 端口映射到容器的 5000 端口
+
+  backend2:  # 另一個服務
+    build:
+      context: ./backend2
+    ports:
+      - "5002:5000"  # 本機的 5002 端口映射到容器的 5000 端口
+
+  frontend:  # 前端服務，在這個服務中的前端是部屬在 Nginx 上的
+    build:
+      context: ./frontend
+    ports:
+      - "80:80"  # 本機的 80 端口映射到容器的 80 端口
+
+  nginx:  # Nginx 服務，用於反向代理及當作 Load Balancer
+    build:
+      context: ./nginx
+    ports:
+      - "8080:80"  # 本機的 8080 端口映射到容器的 80 端口
+    depends_on:  # 定義服務的依賴關係，表示當要啟動這個服務時，需要 backend1、backend2、frontend 這三個服務都已經被啟動。但是這個指令只能確保啟動順序，並不能保證服務的可用性。
+      - backend1  # Nginx 服務依賴 backend1
+      - backend2  # Nginx 服務依賴 backend2
+      - frontend  # Nginx 服務依賴 frontend
+```
+6. 此時的資料夾結構如下
+```
+.
+├── backend1
+│   ├── app.py
+│   └── Dockerfile
+├── backend2
+│   ├── app.py
+│   └── Dockerfile
+├── frontend
+│   ├── Dockerfile
+│   └── index.html
+├── nginx
+│   ├── Dockerfile
+│   └── nginx.conf
+└── docker-compose.yaml
+```
+7. 接著我們到我們的專案資料夾，執行以下指令
+```bash
+$ docker-compose up -d # 啟動容器，`-d` 表示在背景執行，這樣就不會佔用終端機
+```
+8. 最後我們打開瀏覽器，輸入 `http://localhost`，就可以看到我們的 index.html 了。頁面上會呈現一個按鈕，點擊按鈕後，會顯示 `Hello from Backend 1` 或 `Hello from Backend 2`，這表示我們的 Load Balancer 已經成功的將流量分配到不同的 Server 上了。
+
 
